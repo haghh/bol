@@ -12,7 +12,7 @@ import type { FetchFn } from './http'
 import { createSpeaker, type Speaker } from './speaker'
 import { createDeepgramStt, createOpenAiStt, createWhisperLocalStt } from './stt'
 import { createElevenLabsTts, createOpenAiTts, createPiperTts, createWindowsTts, type AudioPlayer, type SynthTts } from './tts'
-import { clipSeconds, isSilent } from './wav'
+import { clipSeconds, isSilent, prepareClip } from './wav'
 
 const PROVIDER_NAMES = { 'whisper-local': 'Whisper', openai: 'OpenAI', deepgram: 'Deepgram', windows: 'Windows', piper: 'Piper', elevenlabs: 'ElevenLabs', kokoro: 'Kokoro' }
 
@@ -76,7 +76,7 @@ export function createVoiceService({
 			if (clipSeconds({ clip }) < 0.3 || isSilent({ clip })) return ''
 			const provider = stt()
 			try {
-				return await provider.transcribe(clip, { language: getSettings().language ?? undefined, signal })
+				return await provider.transcribe(prepareClip({ clip }), { language: getSettings().language ?? undefined, signal })
 			} catch (e) {
 				if (isAbortError(e)) throw e
 				throw toVoiceError({ error: e, provider: PROVIDER_NAMES[provider.id] })

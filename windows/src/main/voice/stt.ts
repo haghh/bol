@@ -16,6 +16,11 @@ import { clipToWav } from './wav'
 
 type GetKey = () => Promise<string | null>
 
+/** Written like a previous transcript: Whisper copies its spelling, names and punctuation. */
+const WHISPER_PROMPT =
+	'Hey Bol, open Chrome and check my Gmail. Play something on Spotify. Open VS Code, PowerShell and File Explorer. ' +
+	'Reply on WhatsApp, Discord, Outlook or Teams. Make an Excel sheet, a Word doc, a PDF. Ask Claude. Search YouTube.'
+
 export function createWhisperLocalStt({
 	root,
 	getModel,
@@ -34,7 +39,11 @@ export function createWhisperLocalStt({
 			const wavPath = join(tmpdir(), `bol-stt-${randomUUID()}.wav`)
 			await writeFile(wavPath, clipToWav({ clip }))
 			try {
-				const args = ['-m', modelPath, '-f', wavPath, '-nt', '-np', '-t', String(Math.min(4, Math.max(1, cpus().length - 1))), '-l', language ?? 'auto']
+				const threads = String(Math.min(8, Math.max(1, cpus().length - 1)))
+				const args = ['-m', modelPath, '-f', wavPath, '-nt', '-np', '-t', threads, '-l', language ?? 'auto', '-bs', '5', '--suppress-nst']
+				// The prompt teaches Whisper the words a PC assistant hears (it otherwise writes "bowl" and "V S code").
+				// It's English, so it's left out when another language is set, where it would pull the transcript to English.
+				if (language == null || language === 'en') args.push('--prompt', WHISPER_PROMPT)
 				const res = await runProcess({ file: exe, args, signal, timeoutMs: 120_000 })
 				if (res.code !== 0) throw new VoiceError({ kind: 'failed', message: "Whisper couldn't transcribe that." })
 				return cleanTranscript({ text: res.stdout.toString('utf8') })

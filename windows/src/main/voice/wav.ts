@@ -53,3 +53,47 @@ export function readWavHeader({ wav }: { wav: Uint8Array }): { sampleRate: numbe
 	if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') return null
 	return { sampleRate: v.getUint32(24, true), dataOffset: 44 }
 }
+
+const FRAME_MS = 20
+const PAD_MS = 250
+const TARGET_PEAK = 0.9 * 32767
+const MAX_GAIN = 8
+
+/**
+ * Tidies a clip before it is transcribed: cuts the silence before and after the speech (keeping a short pad),
+ * because Whisper tends to invent words like "Thank you." in long quiet stretches, and raises a quiet recording
+ * to a steady level (at most 8x, so background hiss isn't blown up).
+ */
+export function prepareClip({ clip }: { clip: AudioClip }): AudioClip {
+	const { pcm16, sampleRate } = clip
+	const frame = Math.max(1, Math.round((sampleRate * FRAME_MS) / 1000))
+	const frameCount = Math.ceil(pcm16.length / frame)
+	const levels = new Float64Array(frameCount)
+	let loudest = 0
+	for (let f = 0; f < frameCount; f++) {
+		let sum = 0
+		const end = Math.min(pcm16.length, (f + 1) * frame)
+		for (let i = f * frame; i < end; i++) sum += (pcm16[i] ?? 0) ** 2
+		levels[f] = Math.sqrt(sum / Math.max(1, end - f * frame))
+		loudest = Math.max(loudest, levels[f] ?? 0)
+	}
+	// Speech is anything within about 26 dB of the loudest frame, and above the mic's floor.
+	const threshold = Math.max(150, loudest * 0.05)
+	let first = 0
+	while (first < frameCount && (levels[first] ?? 0) < threshold) first++
+	let last = frameCount - 1
+	while (last > first && (levels[last] ?? 0) < threshold) last--
+	if (first >= frameCount) return clip
+	const pad = Math.round((sampleRate * PAD_MS) / 1000)
+	const start = Math.max(0, first * frame - pad)
+	const end = Math.min(pcm16.length, (last + 1) * frame + pad)
+	const trimmed = pcm16.subarray(start, end)
+
+	let peak = 0
+	for (const s of trimmed) peak = Math.max(peak, Math.abs(s))
+	const gain = peak === 0 ? 1 : Math.min(MAX_GAIN, TARGET_PEAK / peak)
+	if (gain <= 1) return { pcm16: trimmed.slice(), sampleRate }
+	const out = new Int16Array(trimmed.length)
+	for (let i = 0; i < trimmed.length; i++) out[i] = Math.round((trimmed[i] ?? 0) * gain)
+	return { pcm16: out, sampleRate }
+}

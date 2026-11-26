@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import { createSecretStore, type SecretCrypto } from '../secrets'
 import { parseHotkey } from './hotkey'
 import { cleanForSpeech, cleanTranscript, splitForSpeech } from './text'
-import { clipToWav, isSilent, pcmBytesToWav, readWavHeader } from './wav'
+import { clipToWav, isSilent, pcmBytesToWav, prepareClip, readWavHeader } from './wav'
 
 test('parseHotkey: Alt+Space and friends', () => {
 	assert.deepEqual(parseHotkey({ accelerator: 'Alt+Space' }), { vk: 0x20, isAlt: true, isCtrl: false, isShift: false, isWin: false })
@@ -70,6 +70,22 @@ test('WAV encoding and header', () => {
 test('isSilent', () => {
 	assert.equal(isSilent({ clip: { pcm16: new Int16Array(16_000), sampleRate: 16_000 } }), true)
 	assert.equal(isSilent({ clip: { pcm16: Int16Array.from([0, 5000, -4000]), sampleRate: 16_000 } }), false)
+})
+
+test('prepareClip trims the silence around speech and raises a quiet voice', () => {
+	const rate = 16_000
+	// 1 s of near-silence, 0.5 s of a quiet tone, 1 s of near-silence.
+	const pcm16 = new Int16Array(rate * 2.5)
+	for (let i = 0; i < pcm16.length; i++) pcm16[i] = i % 7 === 0 ? 20 : 0
+	for (let i = rate; i < rate * 1.5; i++) pcm16[i] = Math.round(2000 * Math.sin(i / 5))
+	const out = prepareClip({ clip: { pcm16, sampleRate: rate } })
+	const seconds = out.pcm16.length / rate
+	assert.ok(seconds > 0.9 && seconds < 1.1, `kept ${seconds}s`) // the speech plus 0.25 s each side
+	const peak = Math.max(...out.pcm16.map(Math.abs))
+	assert.ok(peak > 14_000 && peak <= 32_767, `peak ${peak}`)
+	// A loud clip is left at its level.
+	const loud = Int16Array.from({ length: rate }, (_, i) => Math.round(30_000 * Math.sin(i / 5)))
+	assert.deepEqual(prepareClip({ clip: { pcm16: loud, sampleRate: rate } }).pcm16, loud)
 })
 
 // A reversible fake of the OS store, so the test can prove the file holds ciphertext.
