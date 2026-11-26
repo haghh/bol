@@ -1,0 +1,18 @@
+appId: dev.bol.windows
+productName: Bol
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**
+  - resources/**
+  - package.json
+# The Agent SDK spawns Claude Code with files from its package: keep them outside the asar.
+asarUnpack:
+  - node_modules/@anthropic-ai/**
+win:
+  target: nsis
+  icon: resources/icon.png
+nsis:
+  oneClick: true
+  perMachine: false

@@ -1,5 +1,10 @@
 # Bol
 
+> [!NOTE]
+> **This fork adds Bol for Windows** in [`windows/`](windows/README.md): an Electron + React port of the app
+> below, built on its brain. The macOS app is unchanged and remains the work of Mehul Mohan
+> ([mehulmpt/bol](https://github.com/mehulmpt/bol)), under the MIT license.
+
 **Talk to your Mac. Claude does the work.** Press ⌘J, say what you need, and Claude Code does it on your
 Mac, then tells you when it's done. Runs on your Claude subscription. [agentbol.com](https://agentbol.com)
 
