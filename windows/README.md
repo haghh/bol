@@ -1,6 +1,6 @@
 # Bol for Windows
 
-**Talk to your PC. An AI agent does the work.** Press a hotkey, say (for now: type) what you need, and Bol
+**Talk to your PC. An AI agent does the work.** Hold a hotkey, say what you need, and Bol
 does it on your Windows PC, then tells you in a sentence when it's done. It runs hands-off: no approval
 prompts.
 
@@ -19,7 +19,7 @@ It is an independent project and is not affiliated with or endorsed by Anthropic
 | ---------------------------------------------- | ------------------------------------------- |
 | 1. Brain on Windows, text in/out, Claude Code  | Done (`npm run brain`)                      |
 | 2. Tray app, hotkey, React voice bar           | Done, typed input                           |
-| 3. Voice in and out (Whisper, Windows voices)  | Not started; contracts in `src/shared/voice.ts` |
+| 3. Voice in and out (Whisper, Windows voices)  | Done: hold Alt+Space to talk, replies are spoken. See [Voice](#voice) |
 | 4. Screenshot and click control                | Done (PowerShell + Win32), needs testing on a real PC |
 | 5. API-key backends (Anthropic, OpenAI, Gemini)| Done, see [Backends](#backends); not tried with real keys yet |
 | Later: threads window, dictation, auto-update  | Not started                                 |
@@ -40,7 +40,7 @@ Then, from this folder:
 ```powershell
 npm install
 npm run brain    # step 1: talk to the brain in the terminal (type, Enter; /new, /stop, /mcp)
-npm run dev      # the tray app; press Alt+Space anywhere for the voice bar
+npm run dev      # the tray app; hold Alt+Space anywhere and talk
 npm run dist     # a Windows installer in dist/
 ```
 
@@ -51,7 +51,7 @@ changes apply without a restart:
 
 | Key          | Default         | Meaning |
 | ------------ | --------------- | ------- |
-| `hotkey`     | `Alt+Space`     | Opens the voice bar ([Electron accelerator](https://www.electronjs.org/docs/latest/api/accelerator)) |
+| `hotkey`     | `Alt+Space`     | Hold to talk, tap to open the bar ([Electron accelerator](https://www.electronjs.org/docs/latest/api/accelerator); modifiers plus one key) |
 | `backend`    | `claude-code`   | `claude-code`, `anthropic`, `openai` or `gemini` (see [Backends](#backends)) |
 | `model`      | `null`          | Model override; `null` uses the backend's default |
 | `effort`     | `medium`        | `medium`, `high`, `xhigh` or `max` |
@@ -60,10 +60,56 @@ changes apply without a restart:
 | `workspace`  | `null`          | Folder the agent works in; `null` is `~\.bol\workspace` |
 | `claudePath` | `null`          | Path to `claude.exe` if it isn't found automatically |
 | `askFirst`   | `false`         | Ask in the voice bar before each action |
-| `voice`      | Whisper, Windows voices | For build step 3 |
+| `voice`      | local Whisper, Windows voices | `stt`, `tts`, `voiceName`, `isSpeaking`, `muteMicWhileSpeaking`; easiest set from the gear in the voice bar (see [Voice](#voice)) |
+| `language`   | `null`          | Spoken language for speech-to-text, like `en`; `null` detects it |
+| `whisperModel` | `base`        | Local Whisper size: `tiny`, `base` or `small` |
 
 The rest of `~\.bol` matches the original: `mcp.json` for your own MCP servers, `system_prompt.md` to
 replace the built-in instructions, `memory\`, `threads\`, `tasks.jsonl`.
+
+## Voice
+
+Hold **Alt+Space**, speak, let go. The bar shows *Listening* while you hold, *Thinking* while your words are
+turned into text and Bol works, and *Speaking* while the reply is read aloud. A quick tap of the hotkey still
+just opens or closes the bar, and you can always type instead. Pressing the hotkey while Bol is talking
+interrupts it; **Esc** also stops it.
+
+Click the gear in the bar to pick providers and enter API keys. The defaults need no account and no key:
+**Whisper (local)** to hear you and **Windows voices** to speak.
+
+| Hearing (speech-to-text) | Setup |
+| --- | --- |
+| **Whisper, local** (default) | Nothing to do. On first use Bol downloads [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (9 MB) and the `base` model (142 MB) into `~\.bol\voice`, checks their SHA-256, and then works offline. Pick `tiny` (75 MB, fastest) or `small` (466 MB, most accurate) in the gear menu. To use your own files, put `whisper-cli.exe` and its DLLs under `~\.bol\voice\whisper\b5454\Release` and the model at `~\.bol\voice\whisper\models\ggml-base.bin`. |
+| **OpenAI transcription** | Create a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys), paste it in the gear menu under *OpenAI key*. Uses `gpt-4o-mini-transcribe`. |
+| **Deepgram** | Create a key at [console.deepgram.com](https://console.deepgram.com), paste it under *Deepgram key*. Uses `nova-3`. |
+
+| Speaking (text-to-speech) | Setup |
+| --- | --- |
+| **Windows voices** (default) | Nothing to do. Uses the voices installed in Windows (SAPI). Add more under Settings > Time & language > Speech. |
+| **Piper, local** | Nothing to do. On first use Bol downloads [Piper](https://github.com/rhasspy/piper) (22 MB) and the `en_US-lessac-medium` voice (63 MB), then works offline. Other voices: download a `.onnx` and its `.onnx.json` from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices) into `~\.bol\voice\piper\voices`; they appear in the *Voice* list. |
+| **OpenAI voices** | Same OpenAI key as above. Uses `gpt-4o-mini-tts`. |
+| **ElevenLabs** | Create a key at [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys), paste it under *ElevenLabs key*. Your voices appear in the *Voice* list. |
+| **Google Cloud voices** | In the [Google Cloud console](https://console.cloud.google.com), enable the *Cloud Text-to-Speech API* for a project with billing on, create an API key under *APIs & Services > Credentials* (restrict it to that API), and paste it under *Google Cloud key*. Defaults to the Chirp 3 HD voice *Kore*; the *Voice* list shows Chirp 3 HD, Neural2, WaveNet and Standard voices for your *Language* (English when unset). Free each month: 1M characters on Chirp 3 HD and Neural2, 4M on WaveNet and Standard. |
+
+**Where keys live.** Keys are encrypted with Windows (Electron `safeStorage`, DPAPI, tied to your Windows
+account) and saved in `~\.bol\secrets.json`. They are never written to `settings.json`, never sent to the voice
+bar's web page (it only learns *whether* a key is set) and never logged. If Windows' secure storage isn't
+available, Bol refuses to save a key rather than store it in plain text. Remove a key with *Remove* in the gear menu.
+
+**When something goes wrong** the bar shows one short line and carries on: no microphone, microphone blocked
+(Windows Settings > Privacy > Microphone > let desktop apps use it), a missing or rejected API key, a quota
+limit, no network, or a download that failed. Nothing prompts you.
+
+**Good to know**
+
+- Hold-to-talk uses a Windows keyboard hook (a small PowerShell helper, `src/main/voice/hotkey-host.ps1.ts`),
+  because Electron's shortcuts can't see a key being released. It swallows the combo so Alt+Space doesn't also
+  open the window menu of the app in front. It can't see keys while a window running **as administrator** has
+  focus (a Windows rule). If the hook can't start, the hotkey falls back to a plain toggle, and the bar says so.
+- The cloud providers send your audio (or reply text) to that company. The local ones never leave your PC.
+- Only `Alt+Space`-style combos (modifiers plus one key, or a lone F-key) can hold-to-talk.
+- `npm run voice:smoke` downloads the local engines and checks, on your PC, that Windows voices and Piper can
+  be understood by Whisper.
 
 ## Backends
 
@@ -113,6 +159,8 @@ There are no prompts, so mistakes have to stay undoable:
 src/
   main/                  Electron main process
     index.ts             tray, hotkey, voice bar window, IPC
+    secrets.ts           API keys encrypted with the OS (safeStorage)
+    voice/               hearing and speaking: providers, push-to-talk hook, downloads (see Voice)
     engine.ts            the swappable backend interface (engines.ts picks one)
     api/                 the API-key engines: tool loop, tools, providers, encrypted keys
     brain/               the original Bol brain, ported from Bun to Node (Claude Code engine)
@@ -122,7 +170,7 @@ src/
       constants.ts       paths and the Windows prompts
     native/              Windows layer: PowerShell host calling Win32 (input, screenshots, windows, apps)
   preload/               the bridge the voice bar uses
-  renderer/              React voice bar
+  renderer/              React voice bar: mic capture, audio playback, voice settings
   shared/                events, settings and voice contracts shared by both sides
 scripts/brain-cli.ts     step 1: the brain in a terminal
 ```

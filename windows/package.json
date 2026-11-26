@@ -8,14 +8,15 @@
 	"type": "module",
 	"main": "out/main/index.js",
 	"scripts": {
-		"dev": "electron-vite dev",
+		"dev": "install-electron && electron-vite dev",
 		"build": "electron-vite build",
-		"start": "electron-vite preview",
+		"start": "install-electron && electron-vite preview",
 		"brain": "tsx scripts/brain-cli.ts",
+		"voice:smoke": "tsx scripts/voice-smoke.ts",
 		"set-key": "tsx scripts/set-key.ts",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
-		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts src/main/api/engine.test.ts",
-		"dist": "electron-vite build && electron-builder --win"
+		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts src/main/api/engine.test.ts src/main/voice/core.test.ts src/main/voice/providers.test.ts",
+		"dist": "install-electron && electron-vite build && electron-builder --win"
 	},
 	"dependencies": {
 		"@ai-sdk/anthropic": "4.0.106",
