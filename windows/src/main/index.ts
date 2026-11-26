@@ -261,6 +261,8 @@ app.whenReady().then(async () => {
 	buildTray()
 	registerHotkey()
 	bar = createBar()
+	// Show the bar once at launch, so it's clear Bol is running: the tray icon often lands in Windows' hidden overflow.
+	bar.once('ready-to-show', () => showBar({ isListening: false }))
 
 	watchSettings({
 		onChange: (next) => {
