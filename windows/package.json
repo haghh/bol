@@ -13,12 +13,18 @@
 		"start": "electron-vite preview",
 		"brain": "tsx scripts/brain-cli.ts",
 		"voice:smoke": "tsx scripts/voice-smoke.ts",
+		"set-key": "tsx scripts/set-key.ts",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
-		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts src/main/voice/core.test.ts src/main/voice/providers.test.ts",
+		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts src/main/api/engine.test.ts src/main/voice/core.test.ts src/main/voice/providers.test.ts",
 		"dist": "electron-vite build && electron-builder --win"
 	},
 	"dependencies": {
+		"@ai-sdk/anthropic": "4.0.106",
+		"@ai-sdk/google": "4.0.122",
+		"@ai-sdk/mcp": "2.0.101",
+		"@ai-sdk/openai": "4.0.121",
 		"@anthropic-ai/claude-agent-sdk": "0.3.319",
+		"ai": "7.0.177",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {

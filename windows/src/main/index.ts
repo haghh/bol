@@ -8,11 +8,11 @@ import { Command, type BrainEvent } from '../shared/events'
 import type { Settings } from '../shared/settings'
 import { ACTIONS_FILE, BOL_DIR, SETTINGS_FILE } from './brain/constants'
 import { setControlExecutor } from './brain/control'
-import { createClaudeCodeEngine } from './brain/index'
 import { emit, log, onEvent } from './brain/protocol'
 import { setApprover } from './brain/safety'
 import { setUrlOpener } from './brain/utils'
 import type { Engine } from './engine'
+import { createEngine } from './engines'
 import { createWindowsControl } from './native/windows-control'
 import { loadSettings, saveSettings, watchSettings } from './settings-store'
 import { setupVoice, type VoiceSetup } from './voice/setup'
@@ -149,14 +149,19 @@ function buildTray() {
 	)
 }
 
-function createEngine(): Engine {
-	switch (settings.backend) {
-		case 'claude-code':
-			return createClaudeCodeEngine({ settings })
-		default:
-			// The API-key engines come in build step 5. Until then, say so instead of failing silently.
-			log({ msg: `backend ${settings.backend} isn't built yet; using claude-code` })
-			return createClaudeCodeEngine({ settings })
+/** Starts the engine for the current backend, replacing any running one. */
+async function startEngine() {
+	engine?.close()
+	status = { isReady: false, backend: null, error: null }
+	engine = createEngine({ settings })
+	try {
+		await engine.start()
+	} catch (e) {
+		const text = e instanceof Error ? e.message : String(e)
+		log({ msg: `engine failed to start: ${text}` })
+		status = { isReady: false, backend: null, error: text }
+		showBar({ isListening: false })
+		emit({ type: 'result', text, isError: true })
 	}
 }
 
@@ -260,21 +265,14 @@ app.whenReady().then(async () => {
 	watchSettings({
 		onChange: (next) => {
 			const isHotkeyChanged = next.hotkey !== settings.hotkey
+			const isBackendChanged = next.backend !== settings.backend
 			settings = next
 			if (isHotkeyChanged) registerHotkey()
-			void engine?.updateSettings(next)
+			if (isBackendChanged) void startEngine()
+			else void engine?.updateSettings(next)
 			bar?.webContents.send('bol:settings', next)
 		},
 	})
 
-	engine = createEngine()
-	try {
-		await engine.start()
-	} catch (e) {
-		const text = e instanceof Error ? e.message : String(e)
-		log({ msg: `engine failed to start: ${text}` })
-		status = { isReady: false, backend: null, error: text }
-		showBar({ isListening: false })
-		emit({ type: 'result', text, isError: true })
-	}
+	await startEngine()
 })

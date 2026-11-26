@@ -3,19 +3,21 @@
 //   npm run brain            (type a request, press Enter; Ctrl+C to quit)
 //   npm run brain -- --log   (also print the brain's log lines)
 //
+// It uses the backend in ~/.bol/settings.json: claude-code (default), anthropic, openai or gemini.
+//
 // Commands: /new starts a new conversation, /stop interrupts, /mcp shows MCP status.
 // Computer control works here too, through the same PowerShell layer the app uses.
 
 import { createInterface } from 'node:readline'
-import { createClaudeCodeEngine } from '../src/main/brain/index'
 import { setControlExecutor } from '../src/main/brain/control'
 import { onEvent } from '../src/main/brain/protocol'
 import { createWindowsControl } from '../src/main/native/windows-control'
+import { createEngine } from '../src/main/engines'
 import { loadSettings } from '../src/main/settings-store'
 
 const isLogging = process.argv.includes('--log')
 const settings = await loadSettings()
-const engine = createClaudeCodeEngine({ settings })
+const engine = createEngine({ settings })
 const control = process.platform === 'win32' ? createWindowsControl() : null
 setControlExecutor(control?.executor ?? null)
 

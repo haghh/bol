@@ -21,7 +21,7 @@ It is an independent project and is not affiliated with or endorsed by Anthropic
 | 2. Tray app, hotkey, React voice bar           | Done, typed input                           |
 | 3. Voice in and out (Whisper, Windows voices)  | Done: hold Alt+Space to talk, replies are spoken. See [Voice](#voice) |
 | 4. Screenshot and click control                | Done (PowerShell + Win32), needs testing on a real PC |
-| 5. API-key backends (Anthropic, OpenAI, Gemini)| Not started; contract in `src/main/engine.ts` |
+| 5. API-key backends (Anthropic, OpenAI, Gemini)| Done, see [Backends](#backends); not tried with real keys yet |
 | Later: threads window, dictation, auto-update  | Not started                                 |
 
 ## Run it
@@ -52,8 +52,8 @@ changes apply without a restart:
 | Key          | Default         | Meaning |
 | ------------ | --------------- | ------- |
 | `hotkey`     | `Alt+Space`     | Hold to talk, tap to open the bar ([Electron accelerator](https://www.electronjs.org/docs/latest/api/accelerator); modifiers plus one key) |
-| `backend`    | `claude-code`   | Which engine runs requests. Only `claude-code` exists so far |
-| `model`      | `null`          | Model override; `null` uses Claude Code's default |
+| `backend`    | `claude-code`   | `claude-code`, `anthropic`, `openai` or `gemini` (see [Backends](#backends)) |
+| `model`      | `null`          | Model override; `null` uses the backend's default |
 | `effort`     | `medium`        | `medium`, `high`, `xhigh` or `max` |
 | `screen`     | `auto`          | `off` removes the screenshot and control tools |
 | `chrome`     | `true`          | Load the Claude in Chrome tools when the extension is installed |
@@ -110,6 +110,33 @@ limit, no network, or a download that failed. Nothing prompts you.
 - `npm run voice:smoke` downloads the local engines and checks, on your PC, that Windows voices and Piper can
   be understood by Whisper.
 
+## Backends
+
+Switch with `backend` in settings; Bol restarts the engine on its own.
+
+| Backend       | Signs in with                      | Default model        | Tools |
+| ------------- | ---------------------------------- | -------------------- | ----- |
+| `claude-code` | your Claude subscription, through the Claude Code you installed | Claude Code's default | everything Claude Code has, plus Bol's control tools, tasks, skills and memory |
+| `anthropic`   | an Anthropic API key               | `claude-opus-5-5`    | the minimal set below |
+| `openai`      | an OpenAI API key                  | `gpt-5.6`            | the minimal set below |
+| `gemini`      | a Google AI Studio API key         | `gemini-pro-latest`  | the minimal set below |
+
+The API-key backends run Bol's own tool loop on the [Vercel AI SDK](https://ai-sdk.dev) with a deliberately
+small tool set: `run_command` (PowerShell), `read_file`, `write_file`, `move_to_recycle_bin`,
+`look_at_screen` and the computer-control tools, plus your MCP servers from `mcp.json`. The same safety
+rules apply to every tool. Background tasks, skills and memory are Claude Code features and aren't there
+yet. Each API call is billed to your key, and screenshots from earlier requests are dropped from the
+conversation to keep that down.
+
+Save a key once; it's encrypted for your Windows account (DPAPI) in `~\.bol\keys.json`:
+
+```powershell
+npm run set-key -- anthropic     # or openai, gemini; paste the key when asked
+```
+
+An environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`) works too
+and takes precedence. Other subscriptions will only ever come in through their vendor's official CLI login.
+
 ## Safety
 
 There are no prompts, so mistakes have to stay undoable:
@@ -133,7 +160,8 @@ src/
     index.ts             tray, hotkey, voice bar window, IPC
     secrets.ts           API keys encrypted with the OS (safeStorage)
     voice/               hearing and speaking: providers, push-to-talk hook, downloads (see Voice)
-    engine.ts            the swappable backend interface
+    engine.ts            the swappable backend interface (engines.ts picks one)
+    api/                 the API-key engines: tool loop, tools, providers, encrypted keys
     brain/               the original Bol brain, ported from Bun to Node (Claude Code engine)
       session.ts         conversations and tasks over the Claude Agent SDK
       safety.ts          hard-block list, backups, action log, Recycle Bin, ask-first

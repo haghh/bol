@@ -21,6 +21,17 @@ const makeLookAtScreen = ({ onScreen }: { onScreen: (event: { reason: string }) 
 		},
 	)
 
+/** Bol's own tool definitions, minus the thread's task tools. The API-key engines use these directly. */
+export function bolToolDefinitions({
+	onScreen,
+	isScreenEnabled,
+}: {
+	onScreen: (event: { reason: string }) => void
+	isScreenEnabled: boolean
+}) {
+	return [recycleTool, ...(isScreenEnabled ? [makeLookAtScreen({ onScreen }), ...controlTools] : [])]
+}
+
 /** Bol's own tools. An SDK MCP server serves one query at a time, so each conversation makes its own. */
 export function makeBolTools({
 	onScreen,
@@ -35,10 +46,6 @@ export function makeBolTools({
 	return createSdkMcpServer({
 		name: 'bol',
 		version: '1.0.0',
-		tools: [
-			recycleTool,
-			...(isScreenEnabled ? [makeLookAtScreen({ onScreen }), ...controlTools] : []),
-			...extraTools,
-		],
+		tools: [...bolToolDefinitions({ onScreen, isScreenEnabled }), ...extraTools],
 	})
 }
