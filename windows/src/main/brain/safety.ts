@@ -169,7 +169,69 @@ function truncateInput(input: unknown): unknown {
 	return text.length <= 2000 ? input : text.slice(0, 2000) + '…'
 }
 
-/** The SDK hooks that enforce all of the above, for one conversation. */
+/** Names of tools that write a file given by `file_path` (Claude Code's, and the API engines' write_file). */
+const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'write_file'])
+
+/**
+ * Checks one tool call before it runs, for any engine: the hard-block list, a backup before a write, and
+ * ask-first. Returns why it's refused (the text the model sees), or null to let it run.
+ */
+export async function guardToolCall({
+	id,
+	name,
+	input,
+	job,
+	cwd,
+	isAskFirst,
+	summary,
+}: {
+	id: string
+	name: string
+	input: Record<string, unknown>
+	job: string | null
+	cwd: string
+	isAskFirst: boolean
+	summary: string
+}): Promise<string | null> {
+	for (const field of ['command', 'script']) {
+		const value = input[field]
+		if (typeof value !== 'string') continue
+		const reason = checkCommand({ command: value, cwd })
+		if (reason != null) {
+			log({ msg: `blocked ${name}: ${reason}: ${value.slice(0, 200)}` })
+			emit({ type: 'blocked', tool: name, reason, ...(job == null ? {} : { job }) })
+			await logAction({ job, tool: name, input: truncateInput(input), blocked: reason })
+			return `Blocked by Bol's safety list: this command ${reason}. Tell the user it's blocked for safety.`
+		}
+	}
+	if (WRITE_TOOLS.has(name) && typeof input.file_path === 'string') {
+		const filePath = resolve(cwd, input.file_path)
+		await backupBeforeWrite({ filePath }).catch((e) => log({ msg: `backup of ${filePath} failed: ${e}` }))
+	}
+	if (isAskFirst && approver != null && !QUIET_TOOLS.has(name)) {
+		const isAllowed = await approver({ id, tool: name, summary, job })
+		if (!isAllowed) return 'The user declined this action. Ask what they want instead.'
+	}
+	return null
+}
+
+/** Adds a finished tool call to the action log. */
+export async function recordToolCall({
+	name,
+	input,
+	job,
+	isError,
+}: {
+	name: string
+	input: unknown
+	job: string | null
+	isError: boolean
+}) {
+	if (QUIET_TOOLS.has(name)) return
+	await logAction({ job, tool: name, input: truncateInput(input), ...(isError ? { isError: true } : {}) })
+}
+
+/** The SDK hooks that enforce all of the above, for one Claude Code conversation. */
 export function makeSafetyHooks({
 	job,
 	cwd,
@@ -188,34 +250,17 @@ export function makeSafetyHooks({
 				hooks: [
 					async (input) => {
 						if (input.hook_event_name !== 'PreToolUse') return {}
-						const name = input.tool_name
 						const args = (input.tool_input ?? {}) as Record<string, unknown>
-						for (const field of ['command', 'script']) {
-							const value = args[field]
-							if (typeof value !== 'string') continue
-							const reason = checkCommand({ command: value, cwd })
-							if (reason != null) {
-								log({ msg: `blocked ${name}: ${reason}: ${value.slice(0, 200)}` })
-								emit({ type: 'blocked', tool: name, reason, ...(job == null ? {} : { job }) })
-								await logAction({ job, tool: name, input: truncateInput(args), blocked: reason })
-								return deny(`Blocked by Bol's safety list: this command ${reason}. Tell the user it's blocked for safety.`)
-							}
-						}
-						if ((name === 'Write' || name === 'Edit' || name === 'MultiEdit') && typeof args.file_path === 'string') {
-							await backupBeforeWrite({ filePath: args.file_path }).catch((e) =>
-								log({ msg: `backup of ${args.file_path} failed: ${e}` }),
-							)
-						}
-						if (isAskFirst() && approver != null && !QUIET_TOOLS.has(name)) {
-							const isAllowed = await approver({
-								id: input.tool_use_id,
-								tool: name,
-								summary: summarize({ name, input: args }),
-								job,
-							})
-							if (!isAllowed) return deny('The user declined this action. Ask what they want instead.')
-						}
-						return {}
+						const reason = await guardToolCall({
+							id: input.tool_use_id,
+							name: input.tool_name,
+							input: args,
+							job,
+							cwd,
+							isAskFirst: isAskFirst(),
+							summary: summarize({ name: input.tool_name, input: args }),
+						})
+						return reason == null ? {} : deny(reason)
 					},
 				],
 			},
@@ -224,8 +269,8 @@ export function makeSafetyHooks({
 			{
 				hooks: [
 					async (input) => {
-						if (input.hook_event_name !== 'PostToolUse' || QUIET_TOOLS.has(input.tool_name)) return {}
-						await logAction({ job, tool: input.tool_name, input: truncateInput(input.tool_input) })
+						if (input.hook_event_name !== 'PostToolUse') return {}
+						await recordToolCall({ name: input.tool_name, input: input.tool_input, job, isError: false })
 						return {}
 					},
 				],
@@ -236,7 +281,7 @@ export function makeSafetyHooks({
 				hooks: [
 					async (input) => {
 						if (input.hook_event_name !== 'PostToolUseFailure') return {}
-						await logAction({ job, tool: input.tool_name, input: truncateInput(input.tool_input), isError: true })
+						await recordToolCall({ name: input.tool_name, input: input.tool_input, job, isError: true })
 						return {}
 					},
 				],
