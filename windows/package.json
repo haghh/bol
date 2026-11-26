@@ -1,0 +1,43 @@
+{
+	"name": "bol-windows",
+	"productName": "Bol",
+	"version": "0.1.0",
+	"description": "Bol for Windows: press a hotkey, speak, and an AI agent does the work on your PC.",
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"main": "out/main/index.js",
+	"scripts": {
+		"dev": "electron-vite dev",
+		"build": "electron-vite build",
+		"start": "electron-vite preview",
+		"brain": "tsx scripts/brain-cli.ts",
+		"set-key": "tsx scripts/set-key.ts",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts src/main/api/engine.test.ts",
+		"dist": "electron-vite build && electron-builder --win"
+	},
+	"dependencies": {
+		"@ai-sdk/anthropic": "4.0.106",
+		"@ai-sdk/google": "4.0.122",
+		"@ai-sdk/mcp": "2.0.101",
+		"@ai-sdk/openai": "4.0.121",
+		"@anthropic-ai/claude-agent-sdk": "0.3.319",
+		"ai": "7.0.177",
+		"zod": "4.6.7"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.6",
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"@vitejs/plugin-react": "6.3.0",
+		"electron": "44.11.1",
+		"electron-builder": "26.18.1",
+		"electron-vite": "6.0.0",
+		"react": "19.3.1",
+		"react-dom": "19.3.1",
+		"tsx": "4.23.15",
+		"typescript": "7.0.2",
+		"vite": "8.3.8"
+	}
+}
