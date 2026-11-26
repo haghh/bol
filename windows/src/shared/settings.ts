@@ -8,7 +8,7 @@ export const STT_PROVIDERS = ['whisper-local', 'openai', 'deepgram'] as const
 export const TTS_PROVIDERS = ['windows', 'openai', 'elevenlabs', 'piper', 'kokoro'] as const
 
 export const Settings = z.object({
-	/** Electron accelerator for the voice bar. Push-to-talk (hold) arrives with the voice step. */
+	/** Electron accelerator for the voice bar. Hold it to talk (see main/voice); a tap opens the bar. */
 	hotkey: z.string().catch('Alt+Space'),
 	/** Which engine runs requests. Only claude-code exists so far; the others are the API-key engines. */
 	backend: z.enum(BACKENDS).catch('claude-code'),
@@ -24,6 +24,14 @@ export const Settings = z.object({
 	workspace: z.string().nullable().catch(null),
 	/** Path to claude.exe; null finds it (PATH, then the native installer's ~/.local/bin). */
 	claudePath: z.string().nullable().catch(null),
+	/** Spoken language for speech-to-text as an ISO 639-1 code ("en"); null detects it. */
+	language: z
+		.string()
+		.regex(/^[a-z]{2,3}$/)
+		.nullable()
+		.catch(null),
+	/** Size of the local Whisper model: bigger is more accurate and slower. */
+	whisperModel: z.enum(['tiny', 'base', 'small']).catch('base'),
 	/** Ask before each tool call. Off by default: Bol is hands-off. Not wired to the UI yet. */
 	askFirst: z.boolean().catch(false),
 	voice: z

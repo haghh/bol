@@ -12,8 +12,9 @@
 		"build": "electron-vite build",
 		"start": "electron-vite preview",
 		"brain": "tsx scripts/brain-cli.ts",
+		"voice:smoke": "tsx scripts/voice-smoke.ts",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
-		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts",
+		"test": "tsx --test src/main/brain/safety.test.ts src/main/native/keys.test.ts src/main/voice/core.test.ts src/main/voice/providers.test.ts",
 		"dist": "electron-vite build && electron-builder --win"
 	},
 	"dependencies": {

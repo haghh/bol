@@ -1,11 +1,14 @@
-// The voice layer's contracts. Not implemented yet (build step 3): the voice bar has a text box until then.
+// The voice layer's contracts (build step 3). The implementations are in src/main/voice.
 //
 // Hearing runs in the renderer (the voice bar window owns the mic through getUserMedia). Push-to-talk:
-// the main process tells the renderer when the hotkey goes down and up ('voice:start' / 'voice:stop' over
-// the preload bridge); the renderer records, transcribes and sends the text as a normal `say` command.
+// the main process tells the renderer when the hotkey goes down and up (VoiceEvent 'ptt' in voice-ipc.ts);
+// the renderer records and sends the clip to the main process, which runs the STT provider (so API keys never
+// reach the renderer) and returns the text; the renderer sends it as a normal `say` command.
 //
-// Speaking can run in either process; a provider says which. The voice bar mutes the mic while speaking
-// (Settings.voice.muteMicWhileSpeaking) and calls stop() when the user interrupts.
+// Speaking also runs in the main process: a TTS provider makes a WAV and the voice bar plays it (see
+// SynthTts in main/voice/tts.ts). The mic is only open while the hotkey is held, so it is never open while Bol
+// speaks; pressing the hotkey during a reply stops it (Settings.voice.muteMicWhileSpeaking is therefore always
+// satisfied). Esc and the hotkey interrupt a reply.
 
 import type { Settings } from './settings'
 
