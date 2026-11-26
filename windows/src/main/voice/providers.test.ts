@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { isAbortError, toVoiceError, VoiceError } from './errors'
 import { createSpeaker } from './speaker'
 import { createDeepgramStt, createOpenAiStt } from './stt'
-import { createElevenLabsTts, createOpenAiTts, type AudioPlayer, type SynthTts } from './tts'
+import { pcmBytesToWav } from './wav'
+import { createElevenLabsTts, createGoogleTts, createOpenAiTts, type AudioPlayer, type SynthTts } from './tts'
 
 type Call = { url: string; init: RequestInit }
 function fakeFetch(respond: (call: Call) => Response | Promise<Response>) {
@@ -92,6 +93,38 @@ test('ElevenLabs TTS: wraps PCM in a WAV, lists voices, validates the voice id',
 	assert.match(calls[1]?.url ?? '', /text-to-speech\/21m00Tcm4TlvDq8ikWAM\?output_format=pcm_24000/)
 	assert.equal(played[0]?.byteLength, 54)
 	assert.equal((calls[1]?.init.headers as Record<string, string>)['xi-api-key'], 'xi')
+})
+
+test('Google Cloud TTS: key in a header, default Chirp 3 HD voice, natural voices listed first', async () => {
+	const wav = pcmBytesToWav({ bytes: new Uint8Array(8), sampleRate: 24_000 })
+	const { fn, calls } = fakeFetch((call) =>
+		call.url.includes('/voices')
+			? json({ voices: [
+					{ name: 'en-US-Standard-A', ssmlGender: 'MALE' },
+					{ name: 'en-US-Studio-O', ssmlGender: 'FEMALE' },
+					{ name: 'en-US-Chirp3-HD-Kore', ssmlGender: 'FEMALE' },
+					{ name: 'en-GB-Neural2-B', ssmlGender: 'MALE' },
+				] })
+			: json({ audioContent: Buffer.from(wav).toString('base64') }),
+	)
+	const played: Uint8Array[] = []
+	const tts = createGoogleTts({ player: { play: async ({ wav }) => void played.push(wav) }, getKey: async () => 'g-key', getLanguage: () => null, fetchFn: fn })
+	assert.deepEqual(await tts.listVoices(), [
+		{ id: 'en-US-Chirp3-HD-Kore', name: 'Kore (Chirp 3 HD, en-US, female)' },
+		{ id: 'en-GB-Neural2-B', name: 'B (Neural2, en-GB, male)' },
+		{ id: 'en-US-Standard-A', name: 'A (Standard, en-US, male)' },
+	])
+	assert.match(calls[0]?.url ?? '', /voices\?languageCode=en$/)
+	await tts.speak('hello', { voice: 'coral' })
+	assert.equal(calls[1]?.url, 'https://texttospeech.googleapis.com/v1/text:synthesize')
+	assert.ok(!calls[1]?.url.includes('g-key'))
+	assert.equal((calls[1]?.init.headers as Record<string, string>)['X-Goog-Api-Key'], 'g-key')
+	const body = JSON.parse(String(calls[1]?.init.body)) as { voice: { name: string; languageCode: string }; audioConfig: { audioEncoding: string } }
+	assert.deepEqual(body.voice, { languageCode: 'en-US', name: 'en-US-Chirp3-HD-Kore' })
+	assert.equal(body.audioConfig.audioEncoding, 'LINEAR16')
+	assert.deepEqual(played[0], wav)
+	await tts.synthesize('hi', { voice: 'en-GB-Neural2-B' })
+	assert.equal((JSON.parse(String(calls[2]?.init.body)) as { voice: { languageCode: string } }).voice.languageCode, 'en-GB')
 })
 
 function fakeTts({ synth }: { synth: (text: string, signal?: AbortSignal) => Promise<Uint8Array> }): SynthTts {

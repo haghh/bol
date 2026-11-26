@@ -11,10 +11,10 @@ import { isAbortError, toVoiceError, VoiceError } from './errors'
 import type { FetchFn } from './http'
 import { createSpeaker, type Speaker } from './speaker'
 import { createDeepgramStt, createOpenAiStt, createWhisperLocalStt } from './stt'
-import { createElevenLabsTts, createOpenAiTts, createPiperTts, createWindowsTts, type AudioPlayer, type SynthTts } from './tts'
+import { createElevenLabsTts, createGoogleTts, createOpenAiTts, createPiperTts, createWindowsTts, type AudioPlayer, type SynthTts } from './tts'
 import { clipSeconds, isSilent, prepareClip } from './wav'
 
-const PROVIDER_NAMES = { 'whisper-local': 'Whisper', openai: 'OpenAI', deepgram: 'Deepgram', windows: 'Windows', piper: 'Piper', elevenlabs: 'ElevenLabs', kokoro: 'Kokoro' }
+const PROVIDER_NAMES = { 'whisper-local': 'Whisper', openai: 'OpenAI', deepgram: 'Deepgram', windows: 'Windows', piper: 'Piper', elevenlabs: 'ElevenLabs', google: 'Google Cloud', kokoro: 'Kokoro' }
 
 export type VoiceService = {
 	/** Text from one push-to-talk clip; '' when nothing was said. Throws VoiceError. */
@@ -64,6 +64,8 @@ export function createVoiceService({
 				return createOpenAiTts({ player, getKey: getKey('openai'), fetchFn })
 			case 'elevenlabs':
 				return createElevenLabsTts({ player, getKey: getKey('elevenlabs'), fetchFn })
+			case 'google':
+				return createGoogleTts({ player, getKey: getKey('google'), getLanguage: () => getSettings().language, fetchFn })
 			case 'piper':
 				return createPiperTts({ player, root, notice, fetchFn })
 			case 'kokoro':

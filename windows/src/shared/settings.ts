@@ -5,12 +5,12 @@ import { z } from 'zod'
 
 export const BACKENDS = ['claude-code', 'anthropic', 'openai', 'gemini'] as const
 export const STT_PROVIDERS = ['whisper-local', 'openai', 'deepgram'] as const
-export const TTS_PROVIDERS = ['windows', 'openai', 'elevenlabs', 'piper', 'kokoro'] as const
+export const TTS_PROVIDERS = ['windows', 'openai', 'elevenlabs', 'google', 'piper', 'kokoro'] as const
 
 export const Settings = z.object({
 	/** Electron accelerator for the voice bar. Hold it to talk (see main/voice); a tap opens the bar. */
 	hotkey: z.string().catch('Alt+Space'),
-	/** Which engine runs requests. Only claude-code exists so far; the others are the API-key engines. */
+	/** Which engine runs requests: claude-code (your subscription) or one of the API-key engines. */
 	backend: z.enum(BACKENDS).catch('claude-code'),
 	/** Model override; null uses the backend's default. */
 	model: z.string().nullable().catch(null),

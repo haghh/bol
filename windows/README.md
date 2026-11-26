@@ -89,6 +89,7 @@ Click the gear in the bar to pick providers and enter API keys. The defaults nee
 | **Piper, local** | Nothing to do. On first use Bol downloads [Piper](https://github.com/rhasspy/piper) (22 MB) and the `en_US-lessac-medium` voice (63 MB), then works offline. Other voices: download a `.onnx` and its `.onnx.json` from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices) into `~\.bol\voice\piper\voices`; they appear in the *Voice* list. |
 | **OpenAI voices** | Same OpenAI key as above. Uses `gpt-4o-mini-tts`. |
 | **ElevenLabs** | Create a key at [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys), paste it under *ElevenLabs key*. Your voices appear in the *Voice* list. |
+| **Google Cloud voices** | In the [Google Cloud console](https://console.cloud.google.com), enable the *Cloud Text-to-Speech API* for a project with billing on, create an API key under *APIs & Services > Credentials* (restrict it to that API), and paste it under *Google Cloud key*. Defaults to the Chirp 3 HD voice *Kore*; the *Voice* list shows Chirp 3 HD, Neural2, WaveNet and Standard voices for your *Language* (English when unset). Free each month: 1M characters on Chirp 3 HD and Neural2, 4M on WaveNet and Standard. |
 
 **Where keys live.** Keys are encrypted with Windows (Electron `safeStorage`, DPAPI, tied to your Windows
 account) and saved in `~\.bol\secrets.json`. They are never written to `settings.json`, never sent to the voice

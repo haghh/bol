@@ -179,3 +179,85 @@ export function createPiperTts({ player, root, notice, fetchFn }: { player: Audi
 		},
 	})
 }
+
+/** A natural Chirp 3 HD voice, for when nothing is chosen (1M free characters a month). */
+export const GOOGLE_DEFAULT_VOICE = 'en-US-Chirp3-HD-Kore'
+const GOOGLE_PCM_RATE = 24_000
+const GOOGLE_API = 'https://texttospeech.googleapis.com/v1'
+/** Voice families worth offering, most natural first. Studio, Polyglot and the rest are left out. */
+const GOOGLE_FAMILIES = [
+	{ tag: 'Chirp3-HD', label: 'Chirp 3 HD' },
+	{ tag: 'Neural2', label: 'Neural2' },
+	{ tag: 'Wavenet', label: 'WaveNet' },
+	{ tag: 'Standard', label: 'Standard' },
+]
+
+/** Google voice names start with their language: "en-US-Chirp3-HD-Kore" is en-US. */
+function googleLanguage({ voice }: { voice: string }): string {
+	return voice.split('-').slice(0, 2).join('-')
+}
+
+export function createGoogleTts({
+	player,
+	getKey,
+	getLanguage,
+	fetchFn = fetch,
+}: {
+	player: AudioPlayer
+	getKey: GetKey
+	/** The spoken language setting ("en"), so the voice list isn't hundreds long; null means English. */
+	getLanguage: () => string | null
+	fetchFn?: FetchFn
+}): SynthTts {
+	// The key goes in a header, not the URL, so it can't end up in a log line.
+	const headers = (key: string) => ({ 'X-Goog-Api-Key': key, 'Content-Type': 'application/json' })
+	return makeTts({
+		id: 'google',
+		player,
+		async listVoices() {
+			const key = await getKey()
+			if (key == null) throw noKeyError({ provider: 'Google Cloud' })
+			const language = getLanguage() ?? 'en'
+			const res = await callApi({ provider: 'Google Cloud', fetchFn, url: `${GOOGLE_API}/voices?languageCode=${encodeURIComponent(language)}`, init: { headers: headers(key) } })
+			const json = (await res.json()) as { voices?: { name?: unknown; ssmlGender?: unknown }[] }
+			const voices = (json.voices ?? []).flatMap((v) => {
+				if (typeof v.name !== 'string') return []
+				const name = v.name
+				const rank = GOOGLE_FAMILIES.findIndex((f) => name.includes(`-${f.tag}-`))
+				if (rank < 0) return []
+				const gender = typeof v.ssmlGender === 'string' && v.ssmlGender !== 'SSML_VOICE_GENDER_UNSPECIFIED' ? `, ${v.ssmlGender.toLowerCase()}` : ''
+				const short = name.slice(name.indexOf(`-${GOOGLE_FAMILIES[rank]?.tag}-`) + (GOOGLE_FAMILIES[rank]?.tag.length ?? 0) + 2)
+				return [{ id: name, name: `${short} (${GOOGLE_FAMILIES[rank]?.label}, ${googleLanguage({ voice: name })}${gender})`, rank }]
+			})
+			voices.sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id))
+			return voices.map(({ id, name }) => ({ id, name }))
+		},
+		async synthesize(text, { voice, signal }) {
+			const key = await getKey()
+			if (key == null) throw noKeyError({ provider: 'Google Cloud' })
+			// Anything that isn't a Google voice name (one left over from another provider) means the default.
+			const name = voice != null && /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z0-9-]+$/.test(voice) ? voice : GOOGLE_DEFAULT_VOICE
+			const res = await callApi({
+				provider: 'Google Cloud',
+				fetchFn,
+				url: `${GOOGLE_API}/text:synthesize`,
+				init: {
+					method: 'POST',
+					headers: headers(key),
+					body: JSON.stringify({
+						input: { text },
+						voice: { languageCode: googleLanguage({ voice: name }), name },
+						audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: GOOGLE_PCM_RATE },
+					}),
+				},
+				signal,
+			})
+			const json = (await res.json()) as { audioContent?: unknown }
+			if (typeof json.audioContent !== 'string') throw new VoiceError({ kind: 'failed', message: 'Google Cloud sent back no audio.' })
+			const audio = new Uint8Array(Buffer.from(json.audioContent, 'base64'))
+			// LINEAR16 comes with a WAV header; wrap it ourselves if one ever doesn't.
+			const isWav = audio.byteLength >= 4 && String.fromCharCode(...audio.subarray(0, 4)) === 'RIFF'
+			return isWav ? audio : pcmBytesToWav({ bytes: audio, sampleRate: GOOGLE_PCM_RATE })
+		},
+	})
+}

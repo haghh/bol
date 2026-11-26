@@ -4,11 +4,11 @@
 import type { SttProviderId, TtsProviderId } from './voice'
 
 /** API keys Bol can hold. Values never travel to the renderer, only whether one is set. */
-export const KEY_NAMES = ['openai', 'deepgram', 'elevenlabs'] as const
+export const KEY_NAMES = ['openai', 'deepgram', 'elevenlabs', 'google'] as const
 export type KeyName = (typeof KEY_NAMES)[number]
 export type KeyStatus = Record<KeyName, boolean>
 
-export const KEY_LABELS: Record<KeyName, string> = { openai: 'OpenAI', deepgram: 'Deepgram', elevenlabs: 'ElevenLabs' }
+export const KEY_LABELS: Record<KeyName, string> = { openai: 'OpenAI', deepgram: 'Deepgram', elevenlabs: 'ElevenLabs', google: 'Google Cloud' }
 
 export type ProviderOption<Id extends string> = { id: Id; label: string; key: KeyName | null; hint: string }
 
@@ -23,6 +23,7 @@ export const TTS_OPTIONS: ProviderOption<TtsProviderId>[] = [
 	{ id: 'piper', label: 'Piper (local)', key: null, hint: 'Free. Downloads a voice on first use.' },
 	{ id: 'openai', label: 'OpenAI voices', key: 'openai', hint: 'Needs an OpenAI API key.' },
 	{ id: 'elevenlabs', label: 'ElevenLabs', key: 'elevenlabs', hint: 'Needs an ElevenLabs API key.' },
+	{ id: 'google', label: 'Google Cloud voices', key: 'google', hint: 'Needs a Google Cloud API key. 1M characters a month free on Chirp 3 HD.' },
 ]
 
 /** Push-to-talk, as the main process reports it to the bar. */
